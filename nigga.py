@@ -1078,13 +1078,25 @@ if __name__ == "__main__":
                 logger.info("🪟 Windows detected - using ProactorEventLoopPolicy")
                 asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
             else:  # Unix/Linux
-                logger.info("🐧 Unix/Linux detected - attempting uvloop")
+                logger.info("🐧 Unix/Linux detected - applying performance optimizations")
                 try:
-                    import uvloop
-                    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-                    logger.info("⚡ uvloop enabled for maximum performance")
-                except ImportError:
-                    logger.info("📦 uvloop not available - using default asyncio policy")
+                    # Use asyncio's built-in performance optimizations
+                    import concurrent.futures
+                    
+                    # Set up thread pool for CPU-bound operations
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    # Create thread pool executor for better performance
+                    executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+                    loop.set_default_executor(executor)
+                    
+                    # Enable asyncio optimizations
+                    loop.set_debug(False)  # Disable debug for production performance
+                    
+                    logger.info("⚡ Asyncio performance optimizations enabled with thread pool")
+                except Exception as e:
+                    logger.info(f"📦 Using default asyncio policy: {e}")
                     pass  # Use default policy
         
         logger.info("🎬 Launching main bot function")
