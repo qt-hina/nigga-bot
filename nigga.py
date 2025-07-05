@@ -90,7 +90,7 @@ os.environ['FORCE_COLOR'] = '1'
 os.environ['TERM'] = 'xterm-256color'
 
 # Setup colored logging
-logger = logging.getLogger("telegram_monitor")
+logger = logging.getLogger("sus_ninja_bot")
 logger.setLevel(logging.INFO)
 
 # Remove any existing handlers
@@ -166,7 +166,7 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'text/plain')
         self.end_headers()
         
-        response_message = b"Telegram Monitor Bot is alive and running!"
+        response_message = b"Sus Ninja Bot is alive and running!"
         self.wfile.write(response_message)
         
         logger.info(f"✅ HTTP response sent to {client_ip}: 200 OK")
@@ -231,7 +231,7 @@ def extract_user_info(msg: Message):
         logger.error(f"❌ Failed to extract user info: {e}")
         return None
 
-logger.info("🚀 Telegram Monitor Bot starting up - loading configuration")
+logger.info("🥷 Sus Ninja Bot starting up - loading configuration")
 
 # Bot configuration
 logger.info("⚙️ Loading bot configuration settings")
@@ -402,11 +402,11 @@ class MessageCache:
             logger.error(f"❌ Error during cleanup process: {e}")
             logger.error(f"🔧 Cleanup state: current_time={current_time}, ttl={self.ttl}")
 
-class TelegramMonitorBot:
+class SusNinjaBot:
     """High-performance Telegram bot for monitoring message deletions and edits"""
     
     def __init__(self, token: str):
-        logger.info("🤖 Initializing TelegramMonitorBot")
+        logger.info("🥷 Initializing SusNinjaBot")
         logger.debug(f"🔑 Bot token length: {len(token) if token else 0} characters")
         try:
             self.bot = Bot(token=token)
@@ -433,9 +433,9 @@ class TelegramMonitorBot:
             logger.info("🔍 Starting deletion monitoring task")
             asyncio.create_task(self._check_deleted_messages())
             
-            logger.info("🎉 TelegramMonitorBot initialization completed successfully")
+            logger.info("🎉 SusNinjaBot initialization completed successfully")
         except Exception as e:
-            logger.error(f"❌ Failed to initialize TelegramMonitorBot: {e}")
+            logger.error(f"❌ Failed to initialize SusNinjaBot: {e}")
             raise
     
     def _setup_handlers(self) -> None:
@@ -483,6 +483,10 @@ class TelegramMonitorBot:
         logger.info(f"🚀 /start command received from {user_info['full_name'] if user_info else 'Unknown'}")
         
         try:
+            # Track user for broadcasting when they use commands
+            if message.from_user:
+                user_ids.add(message.from_user.id)
+                logger.debug(f"👤 User {message.from_user.id} added to broadcast tracking via /start (total: {len(user_ids)})")
             # Check if user was in broadcast mode and cancel it
             if message.from_user and message.from_user.id in broadcast_mode:
                 logger.info(f"🔓 Cancelling broadcast mode for user {message.from_user.id}")
@@ -495,16 +499,29 @@ class TelegramMonitorBot:
                 return
             
             logger.debug("📝 Preparing welcome message and inline keyboard")
-            welcome_text = (
-                "🤖 **Welcome to Message Monitor Bot!**\n\n"
-                "I help you keep track of message deletions and edits in your groups.\n\n"
-                "**Features:**\n"
-                "• 📝 Monitor message edits\n"
-                "• 🗑️ Track message deletions\n"
-                "• ⚡ High-performance handling\n"
-                "• 🔒 Secure and reliable\n\n"
-                "Add me to your group to start monitoring!"
-            )
+            if user_info and user_info["user_id"]:
+                user_mention = f'<a href="tg://user?id={user_info["user_id"]}">{user_info["full_name"]}</a>'
+                welcome_text = (
+                    f"🥷 <b>Welcome to Sus Ninja Bot, {user_mention}!</b>\n\n"
+                    "Your stealthy guardian for tracking suspicious activities in groups!\n\n"
+                    "<b>Ninja Powers:</b>\n"
+                    "• 👁️ Monitor message edits\n"
+                    "• 🗑️ Track message deletions\n"
+                    "• ⚡ Lightning-fast detection\n"
+                    "• 🔒 Silent and secure operation\n\n"
+                    "Add me to your group to unleash the Sus Ninja!"
+                )
+            else:
+                welcome_text = (
+                    "🥷 <b>Welcome to Sus Ninja Bot!</b>\n\n"
+                    "Your stealthy guardian for tracking suspicious activities in groups!\n\n"
+                    "<b>Ninja Powers:</b>\n"
+                    "• 👁️ Monitor message edits\n"
+                    "• 🗑️ Track message deletions\n"
+                    "• ⚡ Lightning-fast detection\n"
+                    "• 🔒 Silent and secure operation\n\n"
+                    "Add me to your group to unleash the Sus Ninja!"
+                )
             
             # Create inline keyboard with specified layout
             logger.debug("🎨 Creating inline keyboard buttons")
@@ -512,8 +529,8 @@ class TelegramMonitorBot:
             
             # First row - 2 buttons
             builder.row(
-                InlineKeyboardButton(text="📢 Updates", url=CHANNEL_URL),
-                InlineKeyboardButton(text="💬 Support", url=GROUP_URL)
+                InlineKeyboardButton(text="Updates", url=CHANNEL_URL),
+                InlineKeyboardButton(text="Support", url=GROUP_URL)
             )
             logger.debug("✅ First row buttons added (Updates & Support)")
             
@@ -524,14 +541,14 @@ class TelegramMonitorBot:
             
             builder.row(
                 InlineKeyboardButton(
-                    text="➕ Add Me To Your Group", 
+                    text="Add Me To Your Group", 
                     url=f"https://t.me/{bot_info.username}?startgroup=true"
                 )
             )
             logger.debug("✅ Second row button added (Add to Group)")
             
             logger.info(f"📤 Sending welcome message to {user_info['full_name'] if user_info else 'user'}")
-            await message.reply(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+            await message.reply(welcome_text, reply_markup=builder.as_markup(), parse_mode="HTML")
             logger.info(f"✅ Welcome message sent successfully to {user_info['user_id'] if user_info else 'unknown'}")
             
         except Exception as e:
@@ -549,28 +566,47 @@ class TelegramMonitorBot:
         logger.info(f"❓ /help command received from {user_info['full_name'] if user_info else 'Unknown'}")
         
         try:
+            # Track user for broadcasting when they use commands
+            if message.from_user:
+                user_ids.add(message.from_user.id)
+                logger.debug(f"👤 User {message.from_user.id} added to broadcast tracking via /help (total: {len(user_ids)})")
             logger.debug("📝 Preparing help message content")
-            help_text = (
-                "🆘 **Message Monitor Bot Help**\n\n"
-                "**Commands:**\n"
-                "• `/start` - Show welcome message\n"
-                "• `/help` - Show this help message\n"
-                "• `/ping` - Check bot status\n\n"
-                "**How it works:**\n"
-                "1. Add me to your group\n"
-                "2. Give me admin permissions\n"
-                "3. I'll monitor all messages\n"
-                "4. When someone deletes or edits a message, I'll announce it\n\n"
-                "**Features:**\n"
-                "• Real-time message monitoring\n"
-                "• Deletion notifications\n"
-                "• Edit history tracking\n"
-                "• High-performance architecture\n\n"
-                "For support, join our group: @TheCryptoElders"
+            if user_info and user_info["user_id"]:
+                user_mention = f'<a href="tg://user?id={user_info["user_id"]}">{user_info["full_name"]}</a>'
+                help_text_basic = (
+                    f"🥷 <b>Sus Ninja Bot Help for {user_mention}</b>\n\n"
+                    "<b>Ninja Commands:</b>\n"
+                    "• <code>/start</code> - Awaken the Sus Ninja\n"
+                    "• <code>/help</code> - Show ninja techniques\n"
+                    "• <code>/ping</code> - Test ninja reflexes\n\n"
+                    "<b>How the Ninja operates:</b>\n"
+                    "1. Add me to your group\n"
+                    "2. Grant me admin stealth powers\n"
+                    "3. I'll silently watch all messages\n"
+                    "4. When someone acts sus (deletes/edits), I'll expose them"
+                )
+            else:
+                help_text_basic = (
+                    "🥷 <b>Sus Ninja Bot Help</b>\n\n"
+                    "<b>Ninja Commands:</b>\n"
+                    "• <code>/start</code> - Awaken the Sus Ninja\n"
+                    "• <code>/help</code> - Show ninja techniques\n"
+                    "• <code>/ping</code> - Test ninja reflexes\n\n"
+                    "<b>How the Ninja operates:</b>\n"
+                    "1. Add me to your group\n"
+                    "2. Grant me admin stealth powers\n"
+                    "3. I'll silently watch all messages\n"
+                    "4. When someone acts sus (deletes/edits), I'll expose them"
+                )
+            
+            # Create inline keyboard with expand button
+            builder = InlineKeyboardBuilder()
+            builder.row(
+                InlineKeyboardButton(text="🔍 Expand Details", callback_data="help_expand")
             )
             
             logger.info(f"📤 Sending help message to {user_info['full_name'] if user_info else 'user'}")
-            await message.reply(help_text, parse_mode="Markdown")
+            await message.reply(help_text_basic, reply_markup=builder.as_markup(), parse_mode="HTML")
             logger.info(f"✅ Help message sent successfully to {user_info['user_id'] if user_info else 'unknown'}")
             
         except Exception as e:
@@ -588,6 +624,10 @@ class TelegramMonitorBot:
         logger.info(f"🏓 /ping command received from {user_info['full_name'] if user_info else 'Unknown'}")
         
         try:
+            # Track user for broadcasting when they use commands
+            if message.from_user:
+                user_ids.add(message.from_user.id)
+                logger.debug(f"👤 User {message.from_user.id} added to broadcast tracking via /ping (total: {len(user_ids)})")
             logger.debug("⏱️ Starting ping response timer")
             start_time = time.time()
             
@@ -629,6 +669,10 @@ class TelegramMonitorBot:
                 return
 
             logger.info(f"✅ Owner {message.from_user.id} authorized for broadcast command")
+            
+            # Track owner for broadcasting when they use commands  
+            user_ids.add(message.from_user.id)
+            logger.debug(f"👤 Owner {message.from_user.id} added to broadcast tracking via /broadcast (total: {len(user_ids)})")
             logger.debug(f"📊 Current broadcast stats - Users: {len(user_ids)}, Groups: {len(group_ids)}")
 
             # Create inline keyboard for broadcast target selection
@@ -859,9 +903,9 @@ class TelegramMonitorBot:
             for new_member in message.new_chat_members:
                 if new_member.id == bot_info.id:
                     welcome_msg = (
-                        "👋 **Thanks for adding Message Monitor Bot!**\n\n"
+                        "👋 Thanks for adding Message Monitor Bot!\n\n"
                         "I'm now monitoring this group for message deletions and edits.\n\n"
-                        "**Important:** Make sure I have admin permissions to function properly.\n\n"
+                        "Important: Make sure I have admin permissions to function properly.\n\n"
                         "Type /help for more information!"
                     )
                     
@@ -930,11 +974,156 @@ class TelegramMonitorBot:
         except Exception as e:
             logger.error(f"Error announcing deletion: {e}")
     
+    async def _handle_help_expand(self, callback_query: types.CallbackQuery) -> None:
+        """Handle help expand callback"""
+        try:
+            # Get user info for personalization
+            user_info = None
+            if callback_query.from_user:
+                user_info = {
+                    "user_id": callback_query.from_user.id,
+                    "full_name": callback_query.from_user.full_name or "User"
+                }
+            
+            # Create expanded help message
+            if user_info and user_info["user_id"]:
+                user_mention = f'<a href="tg://user?id={user_info["user_id"]}">{user_info["full_name"]}</a>'
+                help_text_expanded = (
+                    f"🥷 <b>Sus Ninja Bot Help for {user_mention}</b>\n\n"
+                    "<b>Ninja Commands:</b>\n"
+                    "• /start - Awaken the Sus Ninja\n"
+                    "• /help - Show ninja techniques\n"
+                    "• /ping - Test ninja reflexes\n\n"
+                    "<b>How the Ninja operates:</b>\n"
+                    "1. Add me to your group\n"
+                    "2. Grant me admin stealth powers\n"
+                    "3. I'll silently watch all messages\n"
+                    "4. When someone acts sus (deletes/edits), I'll expose them\n\n"
+                    "<b>Ninja Skills:</b>\n"
+                    "• 👁️ Real-time surveillance\n"
+                    "• 🚨 Instant sus detection\n"
+                    "• 📊 Message history tracking\n"
+                    "• ⚡ Lightning-fast performance\n\n"
+                    "<b>Advanced Features:</b>\n"
+                    "• 🔄 Message edit tracking\n"
+                    "• 🗑️ Deletion notifications\n"
+                    "• 📈 Performance analytics\n"
+                    "• 🛡️ Secure operation mode\n\n"
+                    "For ninja support, join our dojo."
+                )
+            else:
+                help_text_expanded = (
+                    "🥷 <b>Sus Ninja Bot Help</b>\n\n"
+                    "<b>Ninja Commands:</b>\n"
+                    "• /start - Awaken the Sus Ninja\n"
+                    "• /help - Show ninja techniques\n"
+                    "• /ping - Test ninja reflexes\n\n"
+                    "<b>How the Ninja operates:</b>\n"
+                    "1. Add me to your group\n"
+                    "2. Grant me admin stealth powers\n"
+                    "3. I'll silently watch all messages\n"
+                    "4. When someone acts sus (deletes/edits), I'll expose them\n\n"
+                    "<b>Ninja Skills:</b>\n"
+                    "• 👁️ Real-time surveillance\n"
+                    "• 🚨 Instant sus detection\n"
+                    "• 📊 Message history tracking\n"
+                    "• ⚡ Lightning-fast performance\n\n"
+                    "<b>Advanced Features:</b>\n"
+                    "• 🔄 Message edit tracking\n"
+                    "• 🗑️ Deletion notifications\n"
+                    "• 📈 Performance analytics\n"
+                    "• 🛡️ Secure operation mode\n\n"
+                    "For ninja support, join our dojo."
+                )
+            
+            # Create minimize button
+            builder = InlineKeyboardBuilder()
+            builder.row(
+                InlineKeyboardButton(text="📖 Minimize", callback_data="help_minimize")
+            )
+            
+            await callback_query.answer()
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    help_text_expanded,
+                    reply_markup=builder.as_markup(),
+                    parse_mode="HTML"
+                )
+                logger.info(f"✅ Help expanded for user {callback_query.from_user.id if callback_query.from_user else 'unknown'}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error expanding help: {e}")
+            await callback_query.answer("❌ Error expanding help", show_alert=True)
+    
+    async def _handle_help_minimize(self, callback_query: types.CallbackQuery) -> None:
+        """Handle help minimize callback"""
+        try:
+            # Get user info for personalization
+            user_info = None
+            if callback_query.from_user:
+                user_info = {
+                    "user_id": callback_query.from_user.id,
+                    "full_name": callback_query.from_user.full_name or "User"
+                }
+            
+            # Create basic help message
+            if user_info and user_info["user_id"]:
+                user_mention = f'<a href="tg://user?id={user_info["user_id"]}">{user_info["full_name"]}</a>'
+                help_text_basic = (
+                    f"🥷 <b>Sus Ninja Bot Help for {user_mention}</b>\n\n"
+                    "<b>Ninja Commands:</b>\n"
+                    "• <code>/start</code> - Awaken the Sus Ninja\n"
+                    "• <code>/help</code> - Show ninja techniques\n"
+                    "• <code>/ping</code> - Test ninja reflexes\n\n"
+                    "<b>How the Ninja operates:</b>\n"
+                    "1. Add me to your group\n"
+                    "2. Grant me admin stealth powers\n"
+                    "3. I'll silently watch all messages\n"
+                    "4. When someone acts sus (deletes/edits), I'll expose them"
+                )
+            else:
+                help_text_basic = (
+                    "🥷 <b>Sus Ninja Bot Help</b>\n\n"
+                    "<b>Ninja Commands:</b>\n"
+                    "• <code>/start</code> - Awaken the Sus Ninja\n"
+                    "• <code>/help</code> - Show ninja techniques\n"
+                    "• <code>/ping</code> - Test ninja reflexes\n\n"
+                    "<b>How the Ninja operates:</b>\n"
+                    "1. Add me to your group\n"
+                    "2. Grant me admin stealth powers\n"
+                    "3. I'll silently watch all messages\n"
+                    "4. When someone acts sus (deletes/edits), I'll expose them"
+                )
+            
+            # Create expand button
+            builder = InlineKeyboardBuilder()
+            builder.row(
+                InlineKeyboardButton(text="📖 Expand", callback_data="help_expand")
+            )
+            
+            await callback_query.answer()
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    help_text_basic,
+                    reply_markup=builder.as_markup(),
+                    parse_mode="HTML"
+                )
+                logger.info(f"✅ Help minimized for user {callback_query.from_user.id if callback_query.from_user else 'unknown'}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error minimizing help: {e}")
+            await callback_query.answer("❌ Error minimizing help", show_alert=True)
+
     async def _handle_callback_query(self, callback_query: types.CallbackQuery) -> None:
         """Handle inline button callbacks"""
         try:
+            # Handle help expand/minimize
+            if callback_query.data == "help_expand":
+                await self._handle_help_expand(callback_query)
+            elif callback_query.data == "help_minimize":
+                await self._handle_help_minimize(callback_query)
             # Handle broadcast target selection
-            if callback_query.data in ["broadcast_users", "broadcast_groups"]:
+            elif callback_query.data in ["broadcast_users", "broadcast_groups"]:
                 if not callback_query.from_user or callback_query.from_user.id != OWNER_ID:
                     await callback_query.answer("⛔ Access denied", show_alert=True)
                     return
@@ -1020,7 +1209,7 @@ class TelegramMonitorBot:
     async def start_polling(self) -> None:
         """Start the bot with polling"""
         try:
-            logger.info("Starting Message Monitor Bot...")
+            logger.info("Starting Sus Ninja Bot...")
             bot_info = await self.bot.get_me()
             logger.info(f"Bot @{bot_info.username} is running!")
             
@@ -1052,8 +1241,8 @@ async def main():
         logger.info("✅ HTTP server thread started as daemon")
         
         # Create and start bot
-        logger.info("🤖 Creating TelegramMonitorBot instance")
-        bot = TelegramMonitorBot(BOT_TOKEN)
+        logger.info("🥷 Creating SusNinjaBot instance")
+        bot = SusNinjaBot(BOT_TOKEN)
         
         logger.info("🚀 Starting bot polling...")
         await bot.start_polling()
